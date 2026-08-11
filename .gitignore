@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+
+# main.js 直接下载出来的原始抓取快照（文件名带 HHMM 后缀，未经去重/合并）
+# 用 merge_dedup_by_month.py 合并进对应的 ruleclassroom_<space>_<YYYY-MM>.json 后即可丢弃
+ruleclassroom_*_[0-9][0-9][0-9][0-9].json
+
+# merge_dedup_by_month.py 预览模式（不带 --in-place）的输出目录
+merged_output/

@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rule Classroom Archive Viewer</title>
+<style>
+  :root {
+    --bg: #16140f;
+    --bg-elevated: #1d1a14;
+    --panel: #221e17;
+    --paper: #ece4d2;
+    --paper-2: #e1d7c0;
+    --ink: #2a2620;
+    --ink-soft: #5a5344;
+    --muted: #a39c8c;
+    --muted-dim: #726b5c;
+    --hairline: rgba(236,228,210,0.09);
+    --hairline-strong: rgba(236,228,210,0.16);
+    --brass: #c9a066;
+    --brass-strong: #dbb27d;
+    --brass-soft: rgba(201,160,102,0.14);
+    --patina: #7fa08f;
+    --patina-soft: rgba(127,160,143,0.16);
+    --danger: #c07156;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --font-display: 'Iowan Old Style', 'Palatino Linotype', Georgia, 'Songti SC', serif;
+    --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0; background: var(--bg); color: var(--paper);
+    font-family: var(--font-body); line-height: 1.5;
+  }
+  a { color: var(--patina); }
+  :focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+  }
+
+  /* ---------- Topbar ---------- */
+  .topbar {
+    position: sticky; top: 0; z-index: 30;
+    background: var(--bg-elevated);
+    border-bottom: 1px solid var(--hairline-strong);
+    padding: 12px 20px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+
+  .brand {
+    font-family: var(--font-display); font-size: 1.2rem;
+    color: var(--brass-strong); white-space: nowrap;
+  }
+  .brand small {
+    display: block; font-family: var(--font-mono); font-size: .62rem;
+    letter-spacing: .08em; color: var(--muted-dim);
+    text-transform: uppercase; margin-top: 2px;
+  }
+
+  .lang-switch {
+    display: flex; border: 1px solid var(--hairline-strong);
+    border-radius: var(--radius-sm); overflow: hidden; flex-shrink: 0;
+  }
+  .lang-switch button {
+    border: none; border-radius: 0; padding: 6px 11px;
+    font-size: .78rem; font-family: var(--font-mono);
+    color: var(--muted-dim); background: transparent;
+  }
+  .lang-switch button.active { background: var(--brass-soft); color: var(--brass-strong); font-weight: 700; }
+  .lang-switch button:hover:not(.active) { color: var(--paper); background: rgba(236,228,210,.05); }
+
+  /* ---------- Search ---------- */
+  .search-shell { flex: 1 1 360px; min-width: 250px; display: flex; flex-direction: column; gap: 5px; }
+  .search-row { display: flex; align-items: stretch; gap: 6px; }
+  .search-box {
+    position: relative; flex: 1; display: flex; align-items: center;
+    background: var(--bg); border: 1px solid var(--hairline-strong);
+    border-radius: var(--radius-sm); transition: border-color .15s;
+  }
+  .search-box:focus-within { border-color: var(--brass); }
+  .search-box.invalid { border-color: var(--danger); }
+  .search-box .glyph { padding: 0 4px 0 10px; color: var(--muted-dim); font-size: .9rem; user-select: none; }
+  #searchInput {
+    flex: 1; background: transparent; border: none; color: var(--paper);
+    font: inherit; font-size: .88rem; padding: 8px 4px; min-width: 0;
+  }
+  #searchInput:focus { outline: none; }
+  #searchInput::placeholder { color: var(--muted-dim); }
+  .search-clear {
+    border: none; background: transparent; color: var(--muted-dim);
+    padding: 0 9px; font-size: 1rem; line-height: 1; cursor: pointer;
+  }
+  .search-clear:hover { color: var(--paper); background: transparent; border: none; }
+
+  .match-nav {
+    display: flex; align-items: center; gap: 2px;
+    border: 1px solid var(--hairline-strong); border-radius: var(--radius-sm);
+    background: var(--bg); padding: 0 2px;
+  }
+  .match-nav button { border: none; background: transparent; padding: 6px 8px; font-size: .8rem; color: var(--muted); border-radius: 4px; }
+  .match-nav button:hover:not(:disabled) { color: var(--brass-strong); background: var(--brass-soft); }
+  .match-counter {
+    font-family: var(--font-mono); font-size: .72rem; color: var(--muted);
+    padding: 0 6px; white-space: nowrap; min-width: 66px; text-align: center;
+  }
+  .match-counter b { color: var(--brass-strong); }
+
+  .search-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: .72rem; color: var(--muted-dim); }
+  .scope-chips { display: flex; gap: 4px; }
+  .scope-chip {
+    font-size: .7rem; padding: 2px 8px; border-radius: 999px;
+    border: 1px solid var(--hairline-strong); background: transparent;
+    color: var(--muted-dim); cursor: pointer;
+  }
+  .scope-chip.active { border-color: var(--patina); color: var(--patina); background: var(--patina-soft); }
+  .syntax-hint { font-family: var(--font-mono); font-size: .68rem; }
+  .syntax-hint code { background: rgba(236,228,210,.07); padding: 1px 4px; border-radius: 3px; color: var(--muted); }
+  .search-error { color: var(--danger); font-size: .72rem; }
+
+  .topbar-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+  button, .btn {
+    font: inherit; cursor: pointer;
+    border: 1px solid var(--hairline-strong);
+    background: transparent; color: var(--paper);
+    padding: 7px 12px; border-radius: var(--radius-sm);
+    font-size: .82rem; transition: border-color .15s, background .15s;
+  }
+  button:hover:not(:disabled) { border-color: var(--brass); background: var(--brass-soft); }
+  button.primary { background: var(--brass-soft); border-color: var(--brass); color: var(--brass-strong); font-weight: 600; }
+  button:disabled { opacity: .35; cursor: not-allowed; }
+  button.toggle.active { border-color: var(--brass); color: var(--brass-strong); background: var(--brass-soft); }
+
+  .stat-pill { font-family: var(--font-mono); font-size: .75rem; color: var(--muted); white-space: nowrap; }
+  .stat-pill b { color: var(--paper); font-weight: 600; }
+
+  /* ---------- Ticker ---------- */
+  .ticker-wrap { background: var(--panel); border-bottom: 1px solid var(--hairline); padding: 10px 20px 8px; }
+  .ticker-label {
+    font-family: var(--font-mono); font-size: .66rem; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--muted-dim); margin-bottom: 6px;
+  }
+  .ticker { display: flex; align-items: flex-end; gap: 2px; height: 46px; }
+  .ticker-bar {
+    flex: 1; min-width: 2px; background: var(--brass); opacity: .5;
+    border-radius: 2px 2px 0 0; cursor: pointer; position: relative; transition: opacity .1s;
+  }
+  .ticker-bar:hover, .ticker-bar.active { opacity: 1; background: var(--brass-strong); }
+  .ticker-hit { position: absolute; left: 0; right: 0; bottom: 0; background: var(--patina); border-radius: 2px 2px 0 0; }
+
+  /* ---------- Layout ---------- */
+  .layout {
+    display: grid; grid-template-columns: 268px 1fr; gap: 20px;
+    max-width: 1180px; margin: 0 auto; padding: 20px; align-items: start;
+  }
+  .sidebar {
+    position: sticky; top: 152px;
+    background: var(--panel); border: 1px solid var(--hairline);
+    border-radius: var(--radius); padding: 16px;
+    display: flex; flex-direction: column; gap: 15px;
+    max-height: calc(100vh - 172px); overflow-y: auto;
+  }
+  .field-group label {
+    display: block; font-family: var(--font-mono); font-size: .66rem;
+    letter-spacing: .07em; text-transform: uppercase;
+    color: var(--muted-dim); margin-bottom: 6px;
+  }
+  input[type="text"], input[type="date"], select, textarea {
+    width: 100%; font: inherit; background: var(--bg-elevated);
+    border: 1px solid var(--hairline-strong); color: var(--paper);
+    padding: 8px 10px; border-radius: var(--radius-sm); font-size: .84rem;
+  }
+  textarea { resize: vertical; min-height: 90px; font-family: var(--font-mono); font-size: .76rem; }
+  .date-range { display: flex; gap: 6px; align-items: center; }
+  .date-range span { color: var(--muted-dim); font-size: .78rem; }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 5px; }
+  .type-chip {
+    font-size: .76rem; padding: 5px 10px; border-radius: 999px;
+    border: 1px solid var(--hairline-strong); background: transparent;
+    color: var(--muted); cursor: pointer;
+  }
+  .type-chip.active { border-color: var(--patina); color: var(--patina); background: var(--patina-soft); }
+  .divider { height: 1px; background: var(--hairline); border: none; margin: 0; }
+
+  .stats-block { font-size: .8rem; color: var(--muted); }
+  .stats-block .row { display: flex; justify-content: space-between; padding: 3px 0; }
+  .stats-block .row b { color: var(--paper); font-family: var(--font-mono); }
+  .top-users { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
+  .top-user-row {
+    display: flex; justify-content: space-between; font-size: .76rem;
+    color: var(--muted); cursor: pointer; padding: 2px 4px; border-radius: 4px; margin: 0 -4px;
+  }
+  .top-user-row:hover { background: var(--brass-soft); color: var(--paper); }
+  .top-user-row b { color: var(--paper); font-family: var(--font-mono); }
+
+  .saved-list { display: flex; flex-direction: column; gap: 4px; }
+  .saved-item {
+    display: flex; align-items: center; gap: 6px; font-size: .76rem;
+    color: var(--muted); background: var(--bg-elevated);
+    border: 1px solid var(--hairline); border-radius: var(--radius-sm); padding: 5px 8px;
+  }
+  .saved-item .q { flex: 1; font-family: var(--font-mono); cursor: pointer; word-break: break-all; }
+  .saved-item .q:hover { color: var(--brass-strong); }
+  .saved-item .del { cursor: pointer; color: var(--muted-dim); padding: 0 2px; }
+  .saved-item .del:hover { color: var(--danger); }
+
+  /* ---------- Messages ---------- */
+  .main-col { min-width: 0; }
+  .msg-card {
+    background: var(--paper); color: var(--ink);
+    border-radius: var(--radius); padding: 14px 16px 12px;
+    margin-bottom: 12px; border-left: 3px solid var(--brass);
+    box-shadow: 0 1px 2px rgba(0,0,0,.2); scroll-margin-top: 180px;
+  }
+  .msg-card.current-match {
+    border-left-color: var(--patina);
+    box-shadow: 0 0 0 2px var(--patina), 0 1px 2px rgba(0,0,0,.2);
+  }
+  .msg-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .avatar-wrap { flex-shrink: 0; }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; display: block; }
+  .avatar-fallback {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--patina); color: #fff;
+    align-items: center; justify-content: center; font-weight: 700; font-size: .85rem;
+  }
+  .who { min-width: 0; }
+  .name { display: block; font-weight: 700; font-size: .9rem; color: var(--ink); }
+  .meta { display: block; font-family: var(--font-mono); font-size: .68rem; color: var(--ink-soft); margin-top: 1px; }
+  .hit-count {
+    margin-left: auto; font-family: var(--font-mono); font-size: .68rem;
+    background: rgba(127,160,143,.22); color: #3d5c4d;
+    padding: 2px 7px; border-radius: 999px; white-space: nowrap;
+  }
+  .msg-body { font-size: .9rem; word-wrap: break-word; }
+  .msg-body a { color: #4d6e5f; text-decoration: underline; }
+  .msg-body a.mention-chip {
+    background: rgba(0,0,0,.06); color: #8a6a2f;
+    padding: 1px 7px; border-radius: 999px; font-weight: 600; text-decoration: none;
+  }
+  mark.hl { background: rgba(201,160,102,.55); color: var(--ink); border-radius: 2px; padding: 0 1px; font-weight: 600; }
+  mark.hl.focus { background: #f0c078; box-shadow: 0 0 0 1px #a87b3a; }
+
+  .msg-assets { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; margin-top: 10px; }
+  .msg-img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius-sm); display: block; }
+
+  .link-card {
+    display: flex; margin-top: 10px;
+    border: 1px solid rgba(0,0,0,.1); border-radius: var(--radius-sm);
+    overflow: hidden; background: var(--paper-2); text-decoration: none; color: inherit;
+  }
+  .link-thumb { width: 92px; height: 92px; object-fit: cover; flex-shrink: 0; }
+  .link-meta { padding: 8px 10px; min-width: 0; }
+  .link-provider { font-family: var(--font-mono); font-size: .63rem; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-soft); }
+  .link-title { font-weight: 700; font-size: .84rem; margin: 2px 0; }
+  .link-desc { font-size: .76rem; color: var(--ink-soft); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+  .msg-foot { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 2px 9px; border-radius: 999px; font-size: .7rem;
+    background: var(--patina-soft); color: #3d5c4d;
+  }
+  .chip.reply-badge { background: rgba(0,0,0,.06); color: #8a6a2f; }
+  a.chip.reply-badge {
+    text-decoration: none; cursor: pointer;
+    border: 1px solid transparent; transition: background .12s, border-color .12s;
+  }
+  a.chip.reply-badge:hover { background: rgba(201,160,102,.3); border-color: #a87b3a; color: #6b5320; }
+  a.chip.reply-badge .arrow { font-size: .65rem; opacity: .7; }
+
+  /* ---------- Empty ---------- */
+  .empty-state {
+    border: 1.5px dashed var(--hairline-strong); border-radius: var(--radius);
+    padding: 60px 24px; text-align: center; color: var(--muted);
+  }
+  .empty-state.dragover { border-color: var(--brass); background: var(--brass-soft); }
+  .empty-state h2 { font-family: var(--font-display); color: var(--paper); font-weight: 400; font-size: 1.35rem; margin: 0 0 8px; }
+  .empty-state p { font-size: .86rem; max-width: 480px; margin: 6px auto; }
+  .empty-state .icon { font-size: 2rem; margin-bottom: 10px; opacity: .7; }
+
+  .no-results { text-align: center; padding: 48px 20px; color: var(--muted); }
+  .no-results .big { font-family: var(--font-display); font-size: 1.15rem; color: var(--paper); margin-bottom: 8px; }
+  .no-results .hint { font-size: .82rem; }
+  .sentinel { text-align: center; padding: 20px; color: var(--muted-dim); font-size: .78rem; }
+  .error-banner {
+    background: rgba(192,113,86,.15); border: 1px solid var(--danger);
+    color: #e0a08b; border-radius: var(--radius-sm);
+    padding: 8px 12px; font-size: .8rem; margin-bottom: 12px;
+  }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { position: static; max-height: none; }
+    .search-shell { order: 3; flex-basis: 100%; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="brand">Rule Classroom<small data-i18n="brandSub"></small></div>
+
+    <div class="lang-switch">
+      <button id="langZh" data-lang="zh">中文</button>
+      <button id="langEn" data-lang="en">EN</button>
+    </div>
+
+    <div class="search-shell">
+      <div class="search-row">
+        <div class="search-box" id="searchBox">
+          <span class="glyph">⌕</span>
+          <input type="text" id="searchInput" data-i18n-placeholder="searchPlaceholder" autocomplete="off" spellcheck="false">
+          <button class="search-clear" id="searchClear" data-i18n-title="clearSearch" style="display:none">×</button>
+        </div>
+        <div class="match-nav">
+          <button id="prevMatch" data-i18n-title="prevMatch" disabled>↑</button>
+          <span class="match-counter" id="matchCounter">—</span>
+          <button id="nextMatch" data-i18n-title="nextMatch" disabled>↓</button>
+        </div>
+        <button class="toggle" id="regexToggle" data-i18n-title="regexMode">.*</button>
+        <button class="toggle" id="caseToggle" data-i18n-title="caseSensitive">Aa</button>
+        <button id="saveQueryBtn" data-i18n-title="saveQuery">☆</button>
+      </div>
+      <div class="search-meta">
+        <div class="scope-chips" id="scopeChips">
+          <button class="scope-chip active" data-scope="content" data-i18n="scopeContent"></button>
+          <button class="scope-chip active" data-scope="user" data-i18n="scopeUser"></button>
+          <button class="scope-chip active" data-scope="link" data-i18n="scopeLink"></button>
+        </div>
+        <span class="syntax-hint" id="syntaxHint"></span>
+        <span class="search-error" id="searchError"></span>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <span class="stat-pill" id="topStats"></span>
+      <button id="pickFilesBtn" data-i18n="loadJson"></button>
+      <button id="pasteBtn" data-i18n="pasteBtn"></button>
+      <button id="exportBtn" data-i18n="exportResults" disabled></button>
+      <button id="clearBtn" data-i18n="clearAll" disabled></button>
+    </div>
+    <input type="file" id="fileInput" accept=".json" multiple hidden>
+  </div>
+
+  <div class="ticker-wrap" id="tickerWrap" style="display:none">
+    <div class="ticker-label" id="tickerLabel"></div>
+    <div class="ticker" id="ticker"></div>
+  </div>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar" style="display:none">
+      <div class="field-group">
+        <label data-i18n="labelType"></label>
+        <div class="chip-row" id="typeChips"></div>
+      </div>
+
+      <div class="field-group">
+        <label for="userSelect" data-i18n="labelUser"></label>
+        <select id="userSelect"></select>
+      </div>
+
+      <div class="field-group">
+        <label data-i18n="labelDateRange"></label>
+        <div class="date-range">
+          <input type="date" id="dateFrom">
+          <span>–</span>
+          <input type="date" id="dateTo">
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label data-i18n="labelOnly"></label>
+        <div class="chip-row">
+          <button class="type-chip" id="onlyReplies" data-i18n="hasReplies"></button>
+          <button class="type-chip" id="onlyReactions" data-i18n="hasReactions"></button>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label data-i18n="labelSort"></label>
+        <div class="chip-row">
+          <button class="type-chip active" id="sortDesc" data-i18n="newestFirst"></button>
+          <button class="type-chip" id="sortAsc" data-i18n="oldestFirst"></button>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="field-group" id="savedWrap" style="display:none">
+        <label data-i18n="labelSaved"></label>
+        <div class="saved-list" id="savedList"></div>
+      </div>
+
+      <div class="stats-block" id="statsBlock"></div>
+      <button id="resetFiltersBtn" data-i18n="resetFilters"></button>
+    </aside>
+
+    <main class="main-col">
+      <div id="errorHost"></div>
+
+      <div class="empty-state" id="emptyState">
+        <div class="icon">◆</div>
+        <h2 data-i18n="emptyTitle"></h2>
+        <p data-i18n="emptyP1"></p>
+        <p style="color:var(--muted-dim); font-size:.76rem;" data-i18n="emptyP2"></p>
+        <p id="autoLoadStatus" style="display:none; color:var(--brass-strong); font-family:var(--font-mono); font-size:.8rem; margin-top:14px;"></p>
+      </div>
+
+      <textarea id="pasteArea" data-i18n-placeholder="pastePlaceholder" style="display:none"></textarea>
+      <button id="parsePasteBtn" style="display:none; margin-top:8px;" class="primary" data-i18n="parsePaste"></button>
+
+      <div id="msgList"></div>
+      <div class="sentinel" id="sentinel"></div>
+    </main>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+
+  const BATCH = 40;
+  const SAVED_KEY = 'rc_viewer_saved_queries';
+  const LANG_KEY = 'rc_viewer_lang';
+  const THREAD_BASE = 'https://ruleclassroom.com/chats/';
+
+  // ---------- i18n ----------
+  const I18N = {
+    zh: {
+      _locale: 'zh-CN',
+      _htmlLang: 'zh-CN',
+      brandSub: '聊天存档浏览器',
+      searchPlaceholder: '搜索…  按 / 聚焦，Enter 跳下一条',
+      clearSearch: '清空搜索',
+      prevMatch: '上一条命中 (Shift+Enter)',
+      nextMatch: '下一条命中 (Enter)',
+      regexMode: '正则表达式模式',
+      caseSensitive: '区分大小写',
+      saveQuery: '收藏当前搜索',
+      scopeContent: '正文',
+      scopeUser: '用户名',
+      scopeLink: '链接标题/描述',
+      syntaxNormal: '<code>"整句"</code> <code>-排除</code> <code>空格=AND</code>',
+      syntaxRegex: '<code>正则模式</code> 例如 <code>ABRA|AYA</code> <code>\\$\\d+</code>',
+      loadJson: '加载 JSON',
+      pasteBtn: '粘贴',
+      exportResults: '导出结果',
+      clearAll: '清空',
+      loadedCount: '{0} 条已加载',
+      tickerDefault: '活跃度（{0}）· 点击柱条筛选该时段',
+      tickerQuery: '活跃度（{0}）· 绿色为搜索命中分布 · 点击柱条筛选该时段',
+      bucketDay: '按天', bucketWeek: '按周', bucketMonth: '按月（约）',
+      labelType: '类型', labelUser: '用户', labelDateRange: '时间范围',
+      labelOnly: '只看', labelSort: '排序', labelSaved: '收藏的搜索',
+      allUsers: '全部用户', allTypes: '全部',
+      typeText: '文字', typeImage: '图片', typeLink: '链接', typeFile: '文件',
+      hasReplies: '有回复', hasReactions: '有 reaction',
+      newestFirst: '最新在前', oldestFirst: '最早在前',
+      resetFilters: '重置全部筛选',
+      emptyTitle: '拖入或选择你导出的 JSON 文件',
+      emptyP1: '支持一次选择 / 拖入多个文件，会按消息 id 自动去重合并，也可以直接把 JSON 粘贴进来。',
+      emptyP2: '数据只保存在这个页面的内存里，刷新后需要重新加载文件。',
+      pastePlaceholder: '把 JSON 数组粘贴到这里，然后点下面的按钮解析',
+      parsePaste: '解析粘贴内容',
+      statLoaded: '已加载消息', statResults: '当前结果', statHits: '高亮命中',
+      statUsers: '结果中参与人数', statTimeRange: '存档时间范围',
+      sentinelMore: '已加载 {0} / {1} 条，向下滚动加载更多…',
+      sentinelAll: '已显示全部 {0} 条',
+      noResultsTitle: '没有匹配的消息',
+      noResultsSyntaxTitle: '搜索语法有误',
+      noResultsHint: '试试放宽筛选条件，或点击侧边栏的「重置全部筛选」',
+      countUnit: '{0} 条',
+      matchPos: '<b>{0}</b>/{1}<span style="opacity:.6"> · {2}处</span>',
+      hitCount: '{0} 处命中',
+      replyCount: '{0} 条回复',
+      replyLinkTitle: '在 Rule Classroom 打开这个讨论串 (#{0})',
+      replyNoThread: '这条消息没有 conversation_thread_id，无法定位讨论串',
+      unknownUser: '未知用户', unknown: '未知', userN: '用户 {0}',
+      errNoArray: '{0}：没有找到消息数组，请确认文件格式',
+      errDedupe: '{0}：{1} 条消息都已存在（按 id 去重），未新增',
+      errParse: '{0}：JSON 解析失败 — {1}',
+      errRead: '{0}：读取失败',
+      errPasteParse: '粘贴内容解析失败 — {0}',
+      errRegex: '正则语法错误: {0}',
+      confirmClear: '清空当前已加载的全部数据？',
+      exportName: 'rule_classroom_filtered_{0}.json',
+      autoLoading: '正在自动加载存档…',
+      autoLoadPartial: '{0}/{1} 个存档文件自动加载失败，可手动补充加载'
+    },
+    en: {
+      _locale: 'en-US',
+      _htmlLang: 'en',
+      brandSub: 'Chat archive viewer',
+      searchPlaceholder: 'Search…  / to focus, Enter for next hit',
+      clearSearch: 'Clear search',
+      prevMatch: 'Previous hit (Shift+Enter)',
+      nextMatch: 'Next hit (Enter)',
+      regexMode: 'Regular expression mode',
+      caseSensitive: 'Match case',
+      saveQuery: 'Save this search',
+      scopeContent: 'Body',
+      scopeUser: 'Author',
+      scopeLink: 'Link title/description',
+      syntaxNormal: '<code>"exact phrase"</code> <code>-exclude</code> <code>space=AND</code>',
+      syntaxRegex: '<code>regex mode</code> e.g. <code>ABRA|AYA</code> <code>\\$\\d+</code>',
+      loadJson: 'Load JSON',
+      pasteBtn: 'Paste',
+      exportResults: 'Export results',
+      clearAll: 'Clear',
+      loadedCount: '{0} loaded',
+      tickerDefault: 'Activity ({0}) · click a bar to filter that period',
+      tickerQuery: 'Activity ({0}) · green shows where hits fall · click a bar to filter',
+      bucketDay: 'daily', bucketWeek: 'weekly', bucketMonth: 'monthly (approx.)',
+      labelType: 'Type', labelUser: 'Author', labelDateRange: 'Date range',
+      labelOnly: 'Show only', labelSort: 'Sort', labelSaved: 'Saved searches',
+      allUsers: 'All authors', allTypes: 'All',
+      typeText: 'Text', typeImage: 'Image', typeLink: 'Link', typeFile: 'File',
+      hasReplies: 'Has replies', hasReactions: 'Has reactions',
+      newestFirst: 'Newest first', oldestFirst: 'Oldest first',
+      resetFilters: 'Reset all filters',
+      emptyTitle: 'Drop in or choose your exported JSON files',
+      emptyP1: 'Multiple files at once are fine — they merge and de-duplicate by message id. You can also paste JSON directly.',
+      emptyP2: 'Everything stays in this page\u2019s memory. Reload the page and you\u2019ll need to load the files again.',
+      pastePlaceholder: 'Paste a JSON array here, then use the button below to parse it',
+      parsePaste: 'Parse pasted JSON',
+      statLoaded: 'Messages loaded', statResults: 'Current results', statHits: 'Highlighted hits',
+      statUsers: 'Authors in results', statTimeRange: 'Archive covers',
+      sentinelMore: 'Showing {0} of {1} — scroll for more…',
+      sentinelAll: 'Showing all {0}',
+      noResultsTitle: 'No messages match',
+      noResultsSyntaxTitle: 'Search syntax error',
+      noResultsHint: 'Try loosening the filters, or use “Reset all filters” in the sidebar',
+      countUnit: '{0} results',
+      matchPos: '<b>{0}</b>/{1}<span style="opacity:.6"> · {2} hits</span>',
+      hitCount: '{0} hits',
+      replyCount: '{0} replies',
+      replyLinkTitle: 'Open this thread on Rule Classroom (#{0})',
+      replyNoThread: 'This message has no conversation_thread_id, so the thread can\u2019t be located',
+      unknownUser: 'Unknown author', unknown: 'Unknown', userN: 'User {0}',
+      errNoArray: '{0}: no message array found — check the file format',
+      errDedupe: '{0}: all {1} messages already loaded (de-duplicated by id), nothing added',
+      errParse: '{0}: JSON parse failed — {1}',
+      errRead: '{0}: could not read file',
+      errPasteParse: 'Could not parse pasted JSON — {0}',
+      errRegex: 'Invalid regex: {0}',
+      confirmClear: 'Clear all loaded data?',
+      exportName: 'rule_classroom_filtered_{0}.json',
+      autoLoading: 'Auto-loading archive…',
+      autoLoadPartial: '{0} of {1} archive files failed to auto-load — you can load them manually'
+    }
+  };
+
+  let lang = 'en';
+  try { const s = localStorage.getItem(LANG_KEY); if (s && I18N[s]) lang = s; } catch (e) {}
+
+  function t(key, ...args) {
+    let s = (I18N[lang] && I18N[lang][key]) != null ? I18N[lang][key] : key;
+    args.forEach((v, i) => { s = s.split('{' + i + '}').join(v); });
+    return s;
+  }
+
+  // ---------- State ----------
+  let rawById = new Map();
+  let rawMessages = [];
+  let filtered = [];
+  let renderedCount = 0;
+  let sortDesc = true;
+  let activeType = 'all';
+  let activeUser = 'all';
+  let dateFromVal = null;
+  let dateToVal = null;
+  let onlyReplies = false;
+  let onlyReactions = false;
+  let searchRaw = '';
+  let parsedQuery = { include: [], exclude: [], error: null };
+  let regexMode = false;
+  let caseSensitive = false;
+  let scopes = { content: true, user: true, link: true };
+  let hitCounts = new Map();
+  let totalHits = 0;
+  let currentMatchIdx = -1;
+
+  const el = (id) => document.getElementById(id);
+  const msgList = el('msgList');
+  const emptyState = el('emptyState');
+  const sidebar = el('sidebar');
+  const tickerWrap = el('tickerWrap');
+  const errorHost = el('errorHost');
+  const sentinel = el('sentinel');
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+  function showError(msg) {
+    const div = document.createElement('div');
+    div.className = 'error-banner';
+    div.textContent = msg;
+    errorHost.appendChild(div);
+    setTimeout(() => div.remove(), 6000);
+  }
+
+  // ---------- Apply language to static chrome ----------
+  function applyStaticI18n() {
+    document.documentElement.lang = t('_htmlLang');
+    document.querySelectorAll('[data-i18n]').forEach((n) => { n.textContent = t(n.dataset.i18n); });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach((n) => { n.placeholder = t(n.dataset.i18nPlaceholder); });
+    document.querySelectorAll('[data-i18n-title]').forEach((n) => { n.title = t(n.dataset.i18nTitle); });
+    el('syntaxHint').innerHTML = regexMode ? t('syntaxRegex') : t('syntaxNormal');
+    el('langZh').classList.toggle('active', lang === 'zh');
+    el('langEn').classList.toggle('active', lang === 'en');
+  }
+
+  function setLang(next) {
+    if (!I18N[next] || next === lang) return;
+    lang = next;
+    try { localStorage.setItem(LANG_KEY, lang); } catch (e) {}
+    applyStaticI18n();
+    updateTopbarStats();
+    if (rawMessages.length) {
+      populateFilterOptions();
+      renderSaved();
+      applyFilters();
+    } else {
+      updateMatchNav();
+    }
+  }
+
+  // ---------- Sanitizing ----------
+  function sanitizeToBody(html) {
+    let doc;
+    try { doc = new DOMParser().parseFromString(html || '', 'text/html'); }
+    catch (e) { const d = document.createElement('body'); d.textContent = html || ''; return d; }
+    const body = doc.body;
+    body.querySelectorAll('script,style,iframe,object,embed,form,input,svg,img').forEach((n) => n.remove());
+    body.querySelectorAll('*').forEach((node) => {
+      [...node.attributes].forEach((attr) => {
+        const name = attr.name.toLowerCase();
+        if (name.startsWith('on')) node.removeAttribute(attr.name);
+        if (name === 'href' || name === 'src') {
+          const v = attr.value.trim().toLowerCase();
+          if (v.startsWith('javascript:') || v.startsWith('data:')) node.removeAttribute(attr.name);
+        }
+      });
+      if (node.tagName === 'A') {
+        node.setAttribute('target', '_blank');
+        node.setAttribute('rel', 'noopener noreferrer nofollow');
+        if (node.classList.contains('mighty-mention')) node.classList.add('mention-chip');
+      }
+    });
+    return body;
+  }
+
+  function stripTags(html) {
+    if (!html) return '';
+    try { return new DOMParser().parseFromString(html, 'text/html').body.textContent || ''; }
+    catch (e) { return html; }
+  }
+
+  // ---------- Query ----------
+  function parseQuery(raw) {
+    const result = { include: [], exclude: [], error: null };
+    if (!raw.trim()) return result;
+    if (regexMode) {
+      try {
+        new RegExp(raw, caseSensitive ? '' : 'i');
+        result.include.push({ type: 'regex', value: raw });
+      } catch (e) { result.error = t('errRegex', e.message); }
+      return result;
+    }
+    const tokens = raw.match(/-?"[^"]*"?|-?\S+/g) || [];
+    for (let tok of tokens) {
+      let negate = false;
+      if (tok.startsWith('-') && tok.length > 1) { negate = true; tok = tok.slice(1); }
+      if (tok.startsWith('"')) tok = tok.slice(1);
+      if (tok.endsWith('"')) tok = tok.slice(0, -1);
+      if (!tok) continue;
+      (negate ? result.exclude : result.include).push({ type: 'text', value: caseSensitive ? tok : tok.toLowerCase() });
+    }
+    return result;
+  }
+
+  function buildHighlightRegex() {
+    const terms = parsedQuery.include;
+    if (!terms.length || parsedQuery.error) return null;
+    const flags = caseSensitive ? 'g' : 'gi';
+    try {
+      if (regexMode) return new RegExp(terms[0].value, flags);
+      const pattern = terms.map((x) => escapeRegex(x.value)).sort((a, b) => b.length - a.length).join('|');
+      return pattern ? new RegExp(pattern, flags) : null;
+    } catch (e) { return null; }
+  }
+
+  function rawHaystack(m) {
+    const parts = [];
+    if (scopes.content) parts.push(stripTags(m.text || ''));
+    if (scopes.user) parts.push((m.user && m.user.name) || '');
+    if (scopes.link && m.embedded_link) parts.push(m.embedded_link.title || '', m.embedded_link.description || '');
+    return parts.join('\n');
+  }
+
+  function matchesQuery(m) {
+    if (parsedQuery.error) return false;
+    if (!parsedQuery.include.length && !parsedQuery.exclude.length) return true;
+    const rawHay = rawHaystack(m);
+    const hay = caseSensitive ? rawHay : rawHay.toLowerCase();
+    for (const x of parsedQuery.exclude) if (hay.includes(x.value)) return false;
+    if (!parsedQuery.include.length) return true;
+    if (regexMode) {
+      try { return new RegExp(parsedQuery.include[0].value, caseSensitive ? '' : 'i').test(rawHay); }
+      catch (e) { return false; }
+    }
+    return parsedQuery.include.every((x) => hay.includes(x.value));
+  }
+
+  // ---------- Highlighting ----------
+  function highlightNode(root) {
+    const re = buildHighlightRegex();
+    if (!re) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    for (const node of nodes) {
+      const text = node.nodeValue;
+      if (!text) continue;
+      re.lastIndex = 0;
+      if (!re.test(text)) continue;
+      re.lastIndex = 0;
+      const frag = document.createDocumentFragment();
+      let last = 0, match;
+      while ((match = re.exec(text)) !== null) {
+        if (match.index > last) frag.appendChild(document.createTextNode(text.slice(last, match.index)));
+        const mark = document.createElement('mark');
+        mark.className = 'hl';
+        mark.textContent = match[0];
+        frag.appendChild(mark);
+        last = match.index + match[0].length;
+        if (match[0].length === 0) { re.lastIndex++; if (re.lastIndex > text.length) break; }
+      }
+      if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+      if (node.parentNode) node.parentNode.replaceChild(frag, node);
+    }
+  }
+
+  function highlightPlain(str) {
+    if (!str) return '';
+    const span = document.createElement('span');
+    span.textContent = str;
+    highlightNode(span);
+    return span.innerHTML;
+  }
+
+  // ---------- Rendering ----------
+  function avatarHtml(user) {
+    const name = (user && user.name) || '?';
+    const initial = escapeHtml((name.trim().charAt(0) || '?').toUpperCase());
+    if (user && user.avatar_url) {
+      return `<span class="avatar-wrap">
+        <img class="avatar" src="${escapeHtml(user.avatar_url)}" loading="lazy" alt=""
+          onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <div class="avatar avatar-fallback" style="display:none">${initial}</div>
+      </span>`;
+    }
+    return `<span class="avatar-wrap"><div class="avatar avatar-fallback" style="display:flex">${initial}</div></span>`;
+  }
+
+  function formatDate(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return iso || '';
+    return d.toLocaleString(t('_locale'), {
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+    });
+  }
+
+  function renderMessage(m, idx) {
+    const bodyEl = sanitizeToBody(m.text || '');
+    if (scopes.content) highlightNode(bodyEl);
+
+    const reactionsHtml = (m.reactions || []).map((r) =>
+      `<span class="chip">${escapeHtml(r.base_emoji || '')} ${r.count || ''}</span>`).join('');
+
+    const assets = (m.assets || []).filter((a) => a.is_image && a.image_url);
+    const assetsHtml = assets.length
+      ? `<div class="msg-assets">${assets.map((a) =>
+          `<a href="${escapeHtml(a.original_url || a.image_url)}" target="_blank" rel="noopener noreferrer">
+            <img class="msg-img" src="${escapeHtml(a.image_url)}" loading="lazy" alt=""></a>`).join('')}</div>`
+      : '';
+
+    let linkCard = '';
+    if (m.embedded_link) {
+      const l = m.embedded_link;
+      linkCard = `<a class="link-card" href="${escapeHtml(l.url || '#')}" target="_blank" rel="noopener noreferrer nofollow">
+        ${l.image_url ? `<img class="link-thumb" src="${escapeHtml(l.image_url)}" loading="lazy" alt="">` : ''}
+        <div class="link-meta">
+          <div class="link-provider">${escapeHtml(l.provider_name || '')}</div>
+          <div class="link-title">${scopes.link ? highlightPlain(l.title || '') : escapeHtml(l.title || '')}</div>
+          ${l.description ? `<div class="link-desc">${scopes.link ? highlightPlain(l.description) : escapeHtml(l.description)}</div>` : ''}
+        </div></a>`;
+    }
+
+    let replyBadge = '';
+    if (m.reply_count > 0) {
+      const threadId = m.conversation_thread_id;
+      replyBadge = threadId
+        ? `<a class="chip reply-badge" href="${THREAD_BASE}${threadId}" target="_blank" rel="noopener noreferrer"
+             title="${escapeHtml(t('replyLinkTitle', threadId))}">${escapeHtml(t('replyCount', m.reply_count))} <span class="arrow">↗</span></a>`
+        : `<span class="chip reply-badge" title="${escapeHtml(t('replyNoThread'))}">${escapeHtml(t('replyCount', m.reply_count))}</span>`;
+    }
+
+    const hits = hitCounts.get(m.id) || 0;
+    const hitBadge = hits > 0 ? `<span class="hit-count">${escapeHtml(t('hitCount', hits))}</span>` : '';
+    const authorName = (m.user && m.user.name) || t('unknownUser');
+    const nameHtml = scopes.user ? highlightPlain(authorName) : escapeHtml(authorName);
+
+    return `<article class="msg-card" data-id="${m.id}" data-idx="${idx}">
+      <div class="msg-head">
+        ${avatarHtml(m.user)}
+        <div class="who">
+          <span class="name">${nameHtml}</span>
+          <span class="meta">${formatDate(m.created_at)} · #${m.id}</span>
+        </div>
+        ${hitBadge}
+      </div>
+      <div class="msg-body">${bodyEl.innerHTML}</div>
+      ${assetsHtml}
+      ${linkCard}
+      ${(reactionsHtml || replyBadge) ? `<div class="msg-foot">${reactionsHtml}${replyBadge}</div>` : ''}
+    </article>`;
+  }
+
+  // ---------- Filtering ----------
+  function passesNonSearchFilters(m) {
+    if (activeType !== 'all' && m.type !== activeType) return false;
+    if (activeUser !== 'all' && String(m.user_id) !== activeUser) return false;
+    if (onlyReplies && !(m.reply_count > 0)) return false;
+    if (onlyReactions && !(m.reactions && m.reactions.length)) return false;
+    const ts = new Date(m.created_at).getTime();
+    if (dateFromVal && ts < dateFromVal) return false;
+    if (dateToVal && ts > dateToVal) return false;
+    return true;
+  }
+
+  function applyFilters() {
+    parsedQuery = parseQuery(searchRaw);
+    el('searchError').textContent = parsedQuery.error || '';
+    el('searchBox').classList.toggle('invalid', !!parsedQuery.error);
+
+    hitCounts = new Map();
+    totalHits = 0;
+    filtered = rawMessages.filter((m) => passesNonSearchFilters(m) && matchesQuery(m));
+
+    if (parsedQuery.include.length) {
+      const re = buildHighlightRegex();
+      if (re) {
+        for (const m of filtered) {
+          const hay = rawHaystack(m);
+          re.lastIndex = 0;
+          let c = 0, match;
+          while ((match = re.exec(hay)) !== null) {
+            c++;
+            if (match[0].length === 0) { re.lastIndex++; if (re.lastIndex > hay.length) break; }
+            if (c > 999) break;
+          }
+          hitCounts.set(m.id, c);
+          totalHits += c;
+        }
+      }
+    }
+
+    filtered.sort((a, b) => {
+      const diff = new Date(a.created_at) - new Date(b.created_at);
+      return sortDesc ? -diff : diff;
+    });
+
+    currentMatchIdx = -1;
+    renderedCount = 0;
+    msgList.innerHTML = '';
+    renderBatch();
+    updateStats();
+    updateMatchNav();
+    renderTicker();
+  }
+
+  function renderBatch() {
+    const next = filtered.slice(renderedCount, renderedCount + BATCH);
+    if (next.length === 0 && renderedCount === 0) {
+      const anyFilter = searchRaw || activeType !== 'all' || activeUser !== 'all' || dateFromVal || dateToVal || onlyReplies || onlyReactions;
+      msgList.innerHTML = `<div class="no-results">
+        <div class="big">${escapeHtml(parsedQuery.error ? t('noResultsSyntaxTitle') : t('noResultsTitle'))}</div>
+        <div class="hint">${escapeHtml(parsedQuery.error ? parsedQuery.error : (anyFilter ? t('noResultsHint') : ''))}</div>
+      </div>`;
+      sentinel.textContent = '';
+      return;
+    }
+    if (next.length === 0) { sentinel.textContent = t('sentinelAll', filtered.length); return; }
+
+    const startIdx = renderedCount;
+    msgList.insertAdjacentHTML('beforeend', next.map((m, i) => renderMessage(m, startIdx + i)).join(''));
+    renderedCount += next.length;
+    sentinel.textContent = renderedCount < filtered.length
+      ? t('sentinelMore', renderedCount, filtered.length)
+      : t('sentinelAll', filtered.length);
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((e) => { if (e.isIntersecting && renderedCount < filtered.length) renderBatch(); });
+  }, { rootMargin: '400px' });
+  observer.observe(sentinel);
+
+  // ---------- Match nav ----------
+  function ensureRenderedUpTo(idx) {
+    let guard = 0;
+    while (renderedCount <= idx && renderedCount < filtered.length && guard++ < 500) renderBatch();
+  }
+
+  function gotoMatch(idx) {
+    if (!filtered.length) return;
+    if (idx < 0) idx = filtered.length - 1;
+    if (idx >= filtered.length) idx = 0;
+    currentMatchIdx = idx;
+    ensureRenderedUpTo(idx);
+    const card = msgList.querySelector(`.msg-card[data-idx="${idx}"]`);
+    if (card) {
+      msgList.querySelectorAll('.msg-card.current-match').forEach((c) => c.classList.remove('current-match'));
+      msgList.querySelectorAll('mark.hl.focus').forEach((mk) => mk.classList.remove('focus'));
+      card.classList.add('current-match');
+      card.querySelectorAll('mark.hl').forEach((mk) => mk.classList.add('focus'));
+      card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+    updateMatchNav();
+  }
+
+  function updateMatchNav() {
+    const hasQuery = parsedQuery.include.length > 0 && !parsedQuery.error;
+    const counter = el('matchCounter');
+    el('prevMatch').disabled = !filtered.length;
+    el('nextMatch').disabled = !filtered.length;
+    if (!hasQuery) {
+      counter.innerHTML = filtered.length ? escapeHtml(t('countUnit', filtered.length)) : '—';
+      return;
+    }
+    counter.innerHTML = t('matchPos', currentMatchIdx >= 0 ? currentMatchIdx + 1 : 0, filtered.length, totalHits);
+  }
+
+  // ---------- Stats / ticker ----------
+  function updateTopbarStats() { el('topStats').innerHTML = t('loadedCount', `<b>${rawMessages.length}</b>`); }
+
+  function updateStats() {
+    const byUser = new Map();
+    for (const m of filtered) {
+      const key = (m.user && m.user.name) || t('unknown');
+      byUser.set(key, (byUser.get(key) || 0) + 1);
+    }
+    const top5 = Array.from(byUser.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const min = rawMessages[0] ? formatDate(rawMessages[0].created_at) : '—';
+    const max = rawMessages.length ? formatDate(rawMessages[rawMessages.length - 1].created_at) : '—';
+
+    el('statsBlock').innerHTML = `
+      <div class="row"><span>${escapeHtml(t('statLoaded'))}</span><b>${rawMessages.length}</b></div>
+      <div class="row"><span>${escapeHtml(t('statResults'))}</span><b>${filtered.length}</b></div>
+      ${totalHits ? `<div class="row"><span>${escapeHtml(t('statHits'))}</span><b>${totalHits}</b></div>` : ''}
+      <div class="row"><span>${escapeHtml(t('statUsers'))}</span><b>${byUser.size}</b></div>
+      <div class="row" style="margin-top:4px"><span>${escapeHtml(t('statTimeRange'))}</span></div>
+      <div class="row" style="font-size:.7rem;"><span>${min}</span><span>${max}</span></div>
+      <div class="top-users">
+        ${top5.map(([name, c]) => `<div class="top-user-row" data-name="${escapeHtml(name)}"><span>${escapeHtml(name)}</span><b>${c}</b></div>`).join('')}
+      </div>`;
+
+    el('statsBlock').querySelectorAll('.top-user-row').forEach((row) => {
+      row.addEventListener('click', () => {
+        const sel = el('userSelect');
+        const opt = Array.from(sel.options).find((o) => o.textContent.startsWith(row.dataset.name));
+        if (opt) { sel.value = opt.value; activeUser = opt.value; applyFilters(); }
+      });
+    });
+  }
+
+  function computeBuckets() {
+    if (!rawMessages.length) return null;
+    const times = rawMessages.map((m) => new Date(m.created_at).getTime());
+    const minT = Math.min(...times), maxT = Math.max(...times);
+    const days = (maxT - minT) / 86400000;
+    let bucketMs, labelKey;
+    if (days <= 45) { bucketMs = 86400000; labelKey = 'bucketDay'; }
+    else if (days <= 200) { bucketMs = 7 * 86400000; labelKey = 'bucketWeek'; }
+    else { bucketMs = 30 * 86400000; labelKey = 'bucketMonth'; }
+    return { minT, maxT, bucketMs, labelKey, count: Math.floor((maxT - minT) / bucketMs) + 1 };
+  }
+
+  function renderTicker() {
+    const cfg = computeBuckets();
+    if (!cfg) { tickerWrap.style.display = 'none'; return; }
+    tickerWrap.style.display = 'block';
+
+    const totals = new Array(cfg.count).fill(0);
+    for (const m of rawMessages) {
+      const i = Math.floor((new Date(m.created_at).getTime() - cfg.minT) / cfg.bucketMs);
+      if (i >= 0 && i < cfg.count) totals[i]++;
+    }
+    const hits = new Array(cfg.count).fill(0);
+    const hasQuery = parsedQuery.include.length > 0 && !parsedQuery.error;
+    if (hasQuery) {
+      for (const m of filtered) {
+        const i = Math.floor((new Date(m.created_at).getTime() - cfg.minT) / cfg.bucketMs);
+        if (i >= 0 && i < cfg.count) hits[i]++;
+      }
+    }
+
+    const bucketLabel = t(cfg.labelKey);
+    el('tickerLabel').textContent = hasQuery ? t('tickerQuery', bucketLabel) : t('tickerDefault', bucketLabel);
+
+    const maxCount = Math.max(...totals, 1);
+    el('ticker').innerHTML = totals.map((c, i) => {
+      const h = Math.max(4, Math.round((c / maxCount) * 100));
+      const start = new Date(cfg.minT + i * cfg.bucketMs);
+      const end = new Date(cfg.minT + (i + 1) * cfg.bucketMs);
+      const hitPct = c > 0 ? Math.round((hits[i] / c) * 100) : 0;
+      const title = `${start.toLocaleDateString(t('_locale'))} · ${c}${hasQuery ? ` · ${hits[i]}` : ''}`;
+      return `<div class="ticker-bar" style="height:${h}%" data-start="${start.toISOString()}" data-end="${end.toISOString()}" title="${escapeHtml(title)}">
+        ${hitPct > 0 ? `<div class="ticker-hit" style="height:${hitPct}%"></div>` : ''}
+      </div>`;
+    }).join('');
+
+    el('ticker').querySelectorAll('.ticker-bar').forEach((bar) => {
+      bar.addEventListener('click', () => {
+        const s = new Date(bar.dataset.start), e = new Date(bar.dataset.end);
+        el('dateFrom').value = s.toISOString().slice(0, 10);
+        el('dateTo').value = e.toISOString().slice(0, 10);
+        dateFromVal = s.getTime(); dateToVal = e.getTime();
+        applyFilters();
+      });
+    });
+  }
+
+  // ---------- Saved searches ----------
+  function loadSaved() {
+    try { return JSON.parse(localStorage.getItem(SAVED_KEY)) || []; } catch (e) { return []; }
+  }
+  function renderSaved() {
+    const list = loadSaved();
+    el('savedWrap').style.display = list.length ? 'block' : 'none';
+    el('savedList').innerHTML = list.map((q, i) =>
+      `<div class="saved-item"><span class="q" data-q="${escapeHtml(q)}">${escapeHtml(q)}</span><span class="del" data-i="${i}">×</span></div>`).join('');
+    el('savedList').querySelectorAll('.q').forEach((n) => n.addEventListener('click', () => {
+      el('searchInput').value = n.dataset.q;
+      searchRaw = n.dataset.q;
+      el('searchClear').style.display = 'block';
+      applyFilters();
+    }));
+    el('savedList').querySelectorAll('.del').forEach((n) => n.addEventListener('click', () => {
+      const arr = loadSaved(); arr.splice(Number(n.dataset.i), 1);
+      try { localStorage.setItem(SAVED_KEY, JSON.stringify(arr)); } catch (e) {}
+      renderSaved();
+    }));
+  }
+
+  // ---------- Data ----------
+  function extractArray(json) {
+    if (Array.isArray(json)) return json;
+    if (json && typeof json === 'object') {
+      for (const k of ['messages', 'chats', 'data', 'items']) if (Array.isArray(json[k])) return json[k];
+    }
+    return [];
+  }
+
+  function mergeMessages(list) {
+    let added = 0;
+    for (const m of list) if (m && m.id != null && !rawById.has(m.id)) { rawById.set(m.id, m); added++; }
+    rawMessages = Array.from(rawById.values()).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    return added;
+  }
+
+  function populateFilterOptions() {
+    const types = Array.from(new Set(rawMessages.map((m) => m.type).filter(Boolean)));
+    const typeKey = { text: 'typeText', image: 'typeImage', link: 'typeLink', document: 'typeFile', file: 'typeFile' };
+    const host = el('typeChips');
+    host.innerHTML = `<button class="type-chip ${activeType === 'all' ? 'active' : ''}" data-type="all">${escapeHtml(t('allTypes'))}</button>` +
+      types.map((ty) => `<button class="type-chip ${activeType === ty ? 'active' : ''}" data-type="${escapeHtml(ty)}">${escapeHtml(typeKey[ty] ? t(typeKey[ty]) : ty)}</button>`).join('');
+    host.querySelectorAll('.type-chip').forEach((chip) => chip.addEventListener('click', () => {
+      host.querySelectorAll('.type-chip').forEach((c) => c.classList.remove('active'));
+      chip.classList.add('active');
+      activeType = chip.dataset.type;
+      applyFilters();
+    }));
+
+    const byUser = new Map();
+    for (const m of rawMessages) {
+      if (m.user_id == null) continue;
+      const name = (m.user && m.user.name) || t('userN', m.user_id);
+      const e = byUser.get(m.user_id) || { name, count: 0 };
+      e.count++; byUser.set(m.user_id, e);
+    }
+    el('userSelect').innerHTML = `<option value="all">${escapeHtml(t('allUsers'))}</option>` +
+      Array.from(byUser.entries()).sort((a, b) => b[1].count - a[1].count)
+        .map(([id, u]) => `<option value="${id}">${escapeHtml(u.name)} (${u.count})</option>`).join('');
+    el('userSelect').value = activeUser;
+  }
+
+  function onDataLoaded() {
+    emptyState.style.display = 'none';
+    sidebar.style.display = 'flex';
+    el('exportBtn').disabled = false;
+    el('clearBtn').disabled = false;
+    updateTopbarStats();
+    populateFilterOptions();
+    renderSaved();
+    applyFilters();
+  }
+
+  function handleJsonPayload(json, label) {
+    const arr = extractArray(json);
+    if (!arr.length) { showError(t('errNoArray', label)); return; }
+    const added = mergeMessages(arr);
+    if (added === 0) showError(t('errDedupe', label, arr.length));
+    onDataLoaded();
+  }
+
+  function handleFiles(files) {
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try { handleJsonPayload(JSON.parse(reader.result), file.name); }
+        catch (e) { showError(t('errParse', file.name, e.message)); }
+      };
+      reader.onerror = () => showError(t('errRead', file.name));
+      reader.readAsText(file);
+    });
+  }
+
+  // 部署到 http(s) 服务器（GitHub Pages / VPS）时，同目录下的 manifest.json
+  // 列出所有存档文件，自动 fetch 并合并；本地 file:// 打开时 fetch 会失败，
+  // 静默回退到手动选择文件，不影响原有用法。
+  async function tryAutoLoad() {
+    let manifest;
+    try {
+      const res = await fetch('manifest.json', { cache: 'no-store' });
+      if (!res.ok) return;
+      manifest = await res.json();
+    } catch (e) { return; }
+    if (!Array.isArray(manifest) || !manifest.length) return;
+
+    const statusEl = el('autoLoadStatus');
+    statusEl.textContent = t('autoLoading');
+    statusEl.style.display = 'block';
+
+    const results = await Promise.allSettled(manifest.map((name) =>
+      fetch(name, { cache: 'no-store' }).then((res) => {
+        if (!res.ok) throw new Error(String(res.status));
+        return res.json();
+      })
+    ));
+
+    let failed = 0;
+    for (const r of results) {
+      if (r.status === 'fulfilled') mergeMessages(extractArray(r.value));
+      else failed++;
+    }
+
+    statusEl.style.display = 'none';
+    if (failed) showError(t('autoLoadPartial', failed, manifest.length));
+    if (rawMessages.length) onDataLoaded();
+  }
+
+  // ---------- Wiring ----------
+  el('langZh').addEventListener('click', () => setLang('zh'));
+  el('langEn').addEventListener('click', () => setLang('en'));
+
+  let searchTimer = null;
+  el('searchInput').addEventListener('input', (e) => {
+    const val = e.target.value;
+    el('searchClear').style.display = val ? 'block' : 'none';
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { searchRaw = val; applyFilters(); }, 160);
+  });
+  el('searchInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      clearTimeout(searchTimer);
+      if (searchRaw !== e.target.value) { searchRaw = e.target.value; applyFilters(); }
+      gotoMatch(e.shiftKey ? currentMatchIdx - 1 : currentMatchIdx + 1);
+    }
+    if (e.key === 'Escape') e.target.blur();
+  });
+  el('searchClear').addEventListener('click', () => {
+    el('searchInput').value = ''; searchRaw = '';
+    el('searchClear').style.display = 'none';
+    applyFilters(); el('searchInput').focus();
+  });
+
+  el('nextMatch').addEventListener('click', () => gotoMatch(currentMatchIdx + 1));
+  el('prevMatch').addEventListener('click', () => gotoMatch(currentMatchIdx - 1));
+
+  el('regexToggle').addEventListener('click', function () {
+    regexMode = !regexMode;
+    this.classList.toggle('active', regexMode);
+    el('syntaxHint').innerHTML = regexMode ? t('syntaxRegex') : t('syntaxNormal');
+    applyFilters();
+  });
+  el('caseToggle').addEventListener('click', function () {
+    caseSensitive = !caseSensitive;
+    this.classList.toggle('active', caseSensitive);
+    applyFilters();
+  });
+
+  el('scopeChips').querySelectorAll('.scope-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const key = chip.dataset.scope;
+      if (scopes[key] && Object.values(scopes).filter(Boolean).length === 1) return;
+      scopes[key] = !scopes[key];
+      chip.classList.toggle('active', scopes[key]);
+      applyFilters();
+    });
+  });
+
+  el('saveQueryBtn').addEventListener('click', () => {
+    const q = el('searchInput').value.trim();
+    if (!q) return;
+    const arr = loadSaved();
+    if (!arr.includes(q)) {
+      arr.unshift(q);
+      try { localStorage.setItem(SAVED_KEY, JSON.stringify(arr.slice(0, 12))); } catch (e) {}
+      renderSaved();
+    }
+  });
+
+  el('pickFilesBtn').addEventListener('click', () => el('fileInput').click());
+  el('fileInput').addEventListener('change', (e) => { if (e.target.files.length) handleFiles(e.target.files); e.target.value = ''; });
+
+  el('pasteBtn').addEventListener('click', () => {
+    const area = el('pasteArea'), btn = el('parsePasteBtn');
+    const show = area.style.display === 'none';
+    area.style.display = show ? 'block' : 'none';
+    btn.style.display = show ? 'inline-block' : 'none';
+  });
+  el('parsePasteBtn').addEventListener('click', () => {
+    const text = el('pasteArea').value.trim();
+    if (!text) return;
+    try {
+      handleJsonPayload(JSON.parse(text), 'paste');
+      el('pasteArea').value = ''; el('pasteArea').style.display = 'none'; el('parsePasteBtn').style.display = 'none';
+    } catch (e) { showError(t('errPasteParse', e.message)); }
+  });
+
+  ['dragover', 'dragenter'].forEach((ev) => emptyState.addEventListener(ev, (e) => { e.preventDefault(); emptyState.classList.add('dragover'); }));
+  ['dragleave', 'drop'].forEach((ev) => emptyState.addEventListener(ev, (e) => { e.preventDefault(); emptyState.classList.remove('dragover'); }));
+  emptyState.addEventListener('drop', (e) => { if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); });
+  document.body.addEventListener('dragover', (e) => e.preventDefault());
+  document.body.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (emptyState.style.display === 'none' && e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+  });
+
+  el('userSelect').addEventListener('change', (e) => { activeUser = e.target.value; applyFilters(); });
+  el('dateFrom').addEventListener('change', (e) => {
+    dateFromVal = e.target.value ? new Date(e.target.value + 'T00:00:00').getTime() : null; applyFilters();
+  });
+  el('dateTo').addEventListener('change', (e) => {
+    dateToVal = e.target.value ? new Date(e.target.value + 'T23:59:59').getTime() : null; applyFilters();
+  });
+
+  el('onlyReplies').addEventListener('click', function () { onlyReplies = !onlyReplies; this.classList.toggle('active', onlyReplies); applyFilters(); });
+  el('onlyReactions').addEventListener('click', function () { onlyReactions = !onlyReactions; this.classList.toggle('active', onlyReactions); applyFilters(); });
+
+  el('sortDesc').addEventListener('click', () => { sortDesc = true; el('sortDesc').classList.add('active'); el('sortAsc').classList.remove('active'); applyFilters(); });
+  el('sortAsc').addEventListener('click', () => { sortDesc = false; el('sortAsc').classList.add('active'); el('sortDesc').classList.remove('active'); applyFilters(); });
+
+  el('resetFiltersBtn').addEventListener('click', () => {
+    searchRaw = ''; activeType = 'all'; activeUser = 'all';
+    dateFromVal = null; dateToVal = null; onlyReplies = false; onlyReactions = false;
+    el('searchInput').value = ''; el('searchClear').style.display = 'none';
+    el('dateFrom').value = ''; el('dateTo').value = '';
+    el('onlyReplies').classList.remove('active'); el('onlyReactions').classList.remove('active');
+    populateFilterOptions();
+    applyFilters();
+  });
+
+  el('exportBtn').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(filtered, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = t('exportName', filtered.length);
+    a.click();
+  });
+
+  el('clearBtn').addEventListener('click', () => {
+    if (!confirm(t('confirmClear'))) return;
+    rawById = new Map(); rawMessages = []; filtered = [];
+    msgList.innerHTML = ''; tickerWrap.style.display = 'none';
+    sidebar.style.display = 'none'; emptyState.style.display = 'block';
+    el('exportBtn').disabled = true; el('clearBtn').disabled = true;
+    updateTopbarStats(); updateMatchNav();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    const tag = document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (e.key === '/') { e.preventDefault(); el('searchInput').focus(); el('searchInput').select(); }
+    if (e.key === 'n') gotoMatch(currentMatchIdx + 1);
+    if (e.key === 'N') gotoMatch(currentMatchIdx - 1);
+  });
+
+  // ---------- Init ----------
+  applyStaticI18n();
+  updateTopbarStats();
+  renderSaved();
+  tryAutoLoad();
+})();
+</script>
+</body>
+</html>
