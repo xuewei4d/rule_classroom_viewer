@@ -1,6 +1,6 @@
 #!/bin/bash
 # 重新生成 manifest.json：列出当前目录下所有 ruleclassroom_*.json 存档文件，
-# 供 rule_classroom_viewer.html 部署到 GitHub Pages / VPS 后自动加载。
+# 供 index.html 部署到 GitHub Pages / VPS 后自动加载。
 # 新增月份文件后重新运行一次即可。
 cd "$(dirname "$0")" || exit 1
 
