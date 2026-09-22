@@ -11,3 +11,7 @@ ruleclassroom_*_[0-9][0-9][0-9][0-9].json
 
 # merge_dedup_by_month.py 预览模式（不带 --in-place）的输出目录
 merged_output/
+
+# venv / 统计脚本输出
+.venv/
+daily_message_counts.html
